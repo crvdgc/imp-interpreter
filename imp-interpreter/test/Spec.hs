@@ -1,2 +1,6 @@
+import           Test.Files (collatzPgm, primesPgm, sumPgm)
+
+testfiles = [collatzPgm, primesPgm, sumPgm]
+
 main :: IO ()
-main = putStrLn "Test suite not yet implemented"
+main = mapM_ print testfiles
