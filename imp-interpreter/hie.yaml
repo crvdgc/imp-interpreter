@@ -1,0 +1,13 @@
+cradle:
+  stack:
+    - path: "./src"
+      component: "imp-interpreter:lib"
+
+    - path: "./app/Main.hs"
+      component: "imp-interpreter:exe:imp-interpret"
+
+    - path: "./app/Paths_imp_interpreter.hs"
+      component: "imp-interpreter:exe:imp-interpret"
+
+    - path: "./test"
+      component: "imp-interpreter:test:imp-interpreter-test"
