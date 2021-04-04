@@ -3,6 +3,7 @@
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE InstanceSigs      #-}
 {-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE RecordWildCards   #-}
 module IMP.Syntax
   ( AExp(..)
   , BExp(..)
@@ -12,13 +13,12 @@ module IMP.Syntax
   )
   where
 
-import           Numeric.Natural
-
 -- -------
 -- Expressions and Statements
 -- -------
-data AExp v = ALit Natural | AVar v
-            | ANeg Natural
+
+data AExp v = ALit Int | AVar v
+            | ANeg Int
             | ADiv (AExp v) (AExp v)
             | AAdd (AExp v) (AExp v)
   deriving (Functor, Foldable, Traversable)
@@ -29,9 +29,9 @@ data BExp v = BLit Bool
             | BAnd (BExp v) (BExp v)
   deriving (Functor, Foldable, Traversable)
 
-type Block v = Maybe (Stmt v) -- empty block is Nothing
+type Block v = Maybe (Stmt v) -- empty block is @Nothing@
 
-data Stmt v = SBlock  (Block v)
+data Stmt v = SBlock  (Block v)                    -- @SBlock Nothing@ is identity
             | SAssign v (AExp v)
             | SIte    (BExp v) (Block v) (Block v) -- If-then-else
             | SWhile  (BExp v) (Block v)
@@ -51,6 +51,7 @@ data Pgm v = Pgm
 -- -------
 -- Debugging Shows
 -- -------
+
 instance Show v => Show (AExp v) where
   show = \case
     ALit n -> show n
