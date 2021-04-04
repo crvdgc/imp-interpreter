@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveFoldable    #-}
 {-# LANGUAGE DeriveFunctor     #-}
+{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE InstanceSigs      #-}
 {-# LANGUAGE LambdaCase        #-}
@@ -13,6 +14,8 @@ module IMP.Syntax
   )
   where
 
+import           GHC.Generics
+
 -- -------
 -- Expressions and Statements
 -- -------
@@ -21,13 +24,13 @@ data AExp v = ALit Int | AVar v
             | ANeg Int
             | ADiv (AExp v) (AExp v)
             | AAdd (AExp v) (AExp v)
-  deriving (Functor, Foldable, Traversable)
+  deriving (Eq, Functor, Foldable, Traversable, Generic)
 
 data BExp v = BLit Bool
             | BLe  (AExp v) (AExp v)
             | BNeg (BExp v)
             | BAnd (BExp v) (BExp v)
-  deriving (Functor, Foldable, Traversable)
+  deriving (Eq, Functor, Foldable, Traversable, Generic)
 
 type Block v = Maybe (Stmt v) -- empty block is @Nothing@
 
@@ -36,7 +39,7 @@ data Stmt v = SBlock  (Block v)                    -- @SBlock Nothing@ is identi
             | SIte    (BExp v) (Block v) (Block v) -- If-then-else
             | SWhile  (BExp v) (Block v)
             | SSeq    (Stmt v) (Stmt v)
-  deriving (Functor, Foldable, Traversable)
+  deriving (Eq, Functor, Foldable, Traversable, Generic)
 
 -- -------
 -- Programs
@@ -46,7 +49,7 @@ data Pgm v = Pgm
   { decls :: [v]
   , stmt  :: Stmt v
   }
-  deriving (Show, Functor, Foldable, Traversable)
+  deriving (Show, Eq, Functor, Foldable, Traversable, Generic)
 
 -- -------
 -- Debugging Shows

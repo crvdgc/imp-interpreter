@@ -3,8 +3,7 @@ module Test.Files (collatzPgm, primesPgm, sumPgm) where
 
 import           IMP.Syntax
 
-import qualified Data.Text       as T
-import           Numeric.Natural
+import qualified Data.Text  as T
 
 -- -------
 -- Programs
@@ -87,13 +86,13 @@ sumPgm = Pgm
 -- Utils
 -- -------
 
-assignInt :: v -> Natural -> Stmt v
+assignInt :: v -> Int -> Stmt v
 assignInt v n = v `SAssign` ALit n
 
 assignVar :: v -> v -> Stmt v
 assignVar v1 v2 = v1 `SAssign` AVar v2
 
-leInt :: v -> Natural -> BExp v
+leInt :: v -> Int -> BExp v
 leInt v n = AVar v `BLe` ALit n
 
 leVar :: v -> v -> BExp v

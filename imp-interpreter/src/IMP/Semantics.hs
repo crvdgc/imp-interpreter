@@ -50,6 +50,9 @@ indexIdFromSet idSet fv = (, idMap) <$> indexed
                   Nothing -> Left v
                   Just ix -> Right ix
 
+deindexId :: (Functor f) => f IdKey -> IdMap v -> f v
+deindexId indexed idMap = (idMap M.!) <$> indexed
+
 -- -------
 -- Config transition rules
 -- -------
@@ -64,6 +67,3 @@ initializeConfig pgm = Config pgm M.empty
 ruleVarDecl :: Config (Pgm IdKey) -> Config (Stmt IdKey)
 ruleVarDecl Config{..} = Config (stmt kCell) state
 
--- | variable lookup
--- ruleVarLookUp :: Config
--- ruleVarLookUp Config{..} = Config
