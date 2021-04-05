@@ -34,11 +34,12 @@ data BExp v = BLit Bool
 
 type Block v = Maybe (Stmt v) -- empty block is @Nothing@
 
-data Stmt v = SBlock  (Block v)                    -- @SBlock Nothing@ is identity
+data Stmt v = SBlock  (Block v)
             | SAssign v (AExp v)
             | SIte    (BExp v) (Block v) (Block v) -- If-then-else
             | SWhile  (BExp v) (Block v)
             | SSeq    (Stmt v) (Stmt v)
+            | SUnit                                 -- identity of @SSeq@
   deriving (Eq, Functor, Foldable, Traversable, Generic)
 
 -- -------

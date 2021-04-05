@@ -3,6 +3,7 @@
 module IMP.Pattern where
 
 import           Control.Applicative ((<|>))
+import           Data.Function       ((&))
 import           IMP.Syntax
 
 -- -------
@@ -66,10 +67,10 @@ instance RecursiveMatch (Stmt v) where
     SBlock b     -> SBlock <$> block f b
     SIte c b1 b2 -> binaryConstr (block f) (SIte c) b1 b2
     SWhile c b   -> SWhile c <$> block f b
-    SSeq s1 s2   -> binaryRec f SSeq s1 s2 s
+    SSeq s1 s2   -> flip SSeq s2 <$> f s1  -- cannot match through seq
 
 -- -------
--- Patterns
+-- Basic patterns
 -- -------
 
 -- --------------
@@ -143,9 +144,9 @@ block f b = case b of
 -- Stmt patterns
 -- --------------
 
-sBlock :: MatchSelf (Stmt v)
+sBlock :: MatchInto' (Stmt v) (Block v)
 sBlock f s = case s of
-  SBlock _ -> f s
+  SBlock b -> SBlock <$> f b
   _        -> Nothing
 
 sAssign :: MatchSelf (Stmt v)
@@ -168,6 +169,11 @@ sIteCond f = \case
   SIte c b1 b2 -> (\c' -> SIte c' b1 b2) <$> f c
   _            -> Nothing
 
+sIteBlock :: MatchInto' (Stmt v) (Block v)
+sIteBlock f = \case
+  SIte c b1 b2 -> binaryConstr f (SIte c) b1 b2
+  _            -> Nothing
+
 sWhile :: MatchSelf (Stmt v)
 sWhile f s = case s of
   SWhile _ _ -> f s
@@ -178,8 +184,52 @@ sWhileCond f = \case
   SWhile c b -> flip SWhile b <$> f c
   _          -> Nothing
 
+sWhileBlock :: MatchInto' (Stmt v) (Block v)
+sWhileBlock f = \case
+  SWhile c b -> SWhile c <$> f b
+  _          -> Nothing
+
 sSeq :: MatchSelf (Stmt v)
 sSeq f s = case s of
   SSeq _ _ -> f s
   _        -> Nothing
+
+-- -------
+-- Composed patterns
+-- -------
+
+-- | succeeds if any pattern succeeds
+possibly :: [MatchInto' s a] -> MatchInto' s a
+possibly patterns f s = foldr ((<|>) . (\p -> s & p f)) Nothing patterns
+
+aExpAVar :: MatchInto' (AExp v) (AExp v)
+aExpAVar = recursiveMatch . aVar
+
+bExpAExp :: MatchInto' (BExp v) (AExp v)
+bExpAExp = recursiveMatch . bLeArg
+
+bExpAVar :: MatchInto' (BExp v) (AExp v)
+bExpAVar = bExpAExp . aExpAVar
+
+stmtBExp :: MatchInto' (Stmt v) (BExp v)
+stmtBExp = recursiveMatch . possibly
+  [ sIteCond
+  , sWhileCond
+  ]
+
+stmtAExp :: MatchInto' (Stmt v) (AExp v)
+stmtAExp = recursiveMatch . possibly
+  [ sAssignArg
+  , stmtBExp . bExpAExp
+  ]
+
+stmtAVar :: MatchInto' (Stmt v) (AExp v)
+stmtAVar = stmtAExp . aExpAVar
+
+stmtBlock :: MatchInto' (Stmt v) (Block v)
+stmtBlock = recursiveMatch . possibly
+  [ sBlock
+  , sIteBlock
+  , sWhileBlock
+  ]
 
