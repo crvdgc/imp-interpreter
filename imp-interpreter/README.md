@@ -171,7 +171,7 @@ The minimal complete definition is `subMatch` which only specifies the substruct
 We can then use them to construct composed patterns
 
 
-```
+```hs
 -- | succeeds if any pattern succeeds
 possibly :: [MatchInto' s a] -> MatchInto' s a
 possibly patterns f s = foldr ((<|>) . (\p -> s & p f)) Nothing patterns
