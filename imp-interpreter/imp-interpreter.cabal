@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 5edf2d52f32dc2b32f7655dd2bf7407972b2c401d905fc5ef0deaecb95c8145f
+-- hash: c808ebf577d2b329c655170478ca3b6af8c3a73486ba98884acdce753d92feef
 
 name:           imp-interpreter
 version:        0.1.0.0
@@ -27,6 +27,7 @@ source-repository head
 
 library
   exposed-modules:
+      IMP.Exception
       IMP.Pattern
       IMP.Semantics
       IMP.Syntax

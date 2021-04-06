@@ -26,6 +26,9 @@ type MatchSelf a = MatchInto' a a
 -- The whole match will succeed on first match
 class RecursiveMatch a where
   recursiveMatch :: MatchSelf a
+  recursiveMatch f e = f e <|> subMatch (recursiveMatch f) e
+
+  subMatch       :: MatchSelf a
 
 -- | For binary recursive constructors, succeed on first match of
 -- 1. left sub-term
@@ -46,28 +49,6 @@ binaryConstr f constr a1 a2 =
   let aL = flip constr a2 <$> f a1
       aR = constr a1 <$> f a2
    in aL <|> aR
-
-instance RecursiveMatch (AExp v) where
-  recursiveMatch :: MatchSelf (AExp v)
-  recursiveMatch f e = case e of
-    ADiv e1 e2 -> binaryRec f ADiv e1 e2 e
-    AAdd e1 e2 -> binaryRec f AAdd e1 e2 e
-    nonRec     -> f nonRec
-
-instance RecursiveMatch (BExp v) where
-  recursiveMatch :: MatchSelf (BExp v)
-  recursiveMatch f e = case e of
-    BNeg e0    -> BNeg <$> f e0 <|> f e
-    BAnd e1 e2 -> binaryRec f BAnd e1 e2 e
-    nonRec     -> f nonRec
-
-instance RecursiveMatch (Stmt v) where
-  recursiveMatch :: MatchSelf (Stmt v)
-  recursiveMatch f s = case s of
-    SBlock b     -> SBlock <$> block f b
-    SIte c b1 b2 -> binaryConstr (block f) (SIte c) b1 b2
-    SWhile c b   -> SWhile c <$> block f b
-    SSeq s1 s2   -> flip SSeq s2 <$> f s1  -- cannot match through seq
 
 -- -------
 -- Basic patterns
@@ -97,10 +78,20 @@ aDiv f e = case e of
   ADiv _ _ -> f e
   _        -> Nothing
 
+aDivArg :: MatchSelf (AExp v)
+aDivArg f e = case e of
+  ADiv e1 e2 -> binaryConstr f ADiv e1 e2
+  _          -> Nothing
+
 aAdd :: MatchSelf (AExp v)
 aAdd f e = case e of
   AAdd _ _ -> f e
   _        -> Nothing
+
+aAddArg :: MatchSelf (AExp v)
+aAddArg f e = case e of
+  AAdd e1 e2 -> binaryConstr f AAdd e1 e2
+  _          -> Nothing
 
 -- --------------
 -- BExp patterns
@@ -126,10 +117,20 @@ bNeg f e = case e of
   BNeg _ -> f e
   _      -> Nothing
 
+bNegArg :: MatchSelf (BExp v)
+bNegArg f e = case e of
+  BNeg e0 -> BNeg <$> f e0
+  _       -> Nothing
+
 bAnd :: MatchSelf (BExp v)
 bAnd f e = case e of
   BAnd _ _ -> f e
   _        -> Nothing
+
+bAndArg :: MatchSelf (BExp v)
+bAndArg f e = case e of
+  BAnd e1 e2 -> binaryConstr f BAnd e1 e2
+  _          -> Nothing
 
 -- --------------
 -- Block pattern
@@ -194,6 +195,16 @@ sSeq f s = case s of
   SSeq _ _ -> f s
   _        -> Nothing
 
+sSeqArg :: MatchSelf (Stmt v)
+sSeqArg f s = case s of
+  SSeq s1 s2 -> binaryConstr f SSeq s1 s2
+  _          -> Nothing
+
+sSeqFirst :: MatchSelf (Stmt v)
+sSeqFirst f s = case s of
+  SSeq s1 s2 -> flip SSeq s2 <$> f s1
+  _          -> Nothing
+
 -- -------
 -- Composed patterns
 -- -------
@@ -202,29 +213,27 @@ sSeq f s = case s of
 possibly :: [MatchInto' s a] -> MatchInto' s a
 possibly patterns f s = foldr ((<|>) . (\p -> s & p f)) Nothing patterns
 
+-- | All possible ways to match from @AExp@ to @AVar@, the others are similarly named
 aExpAVar :: MatchInto' (AExp v) (AExp v)
 aExpAVar = recursiveMatch . aVar
 
 bExpAExp :: MatchInto' (BExp v) (AExp v)
 bExpAExp = recursiveMatch . bLeArg
 
-bExpAVar :: MatchInto' (BExp v) (AExp v)
-bExpAVar = bExpAExp . aExpAVar
-
 stmtBExp :: MatchInto' (Stmt v) (BExp v)
 stmtBExp = recursiveMatch . possibly
   [ sIteCond
   , sWhileCond
-  ]
+  ] . recursiveMatch
 
 stmtAExp :: MatchInto' (Stmt v) (AExp v)
 stmtAExp = recursiveMatch . possibly
   [ sAssignArg
   , stmtBExp . bExpAExp
-  ]
+  ] . recursiveMatch
 
 stmtAVar :: MatchInto' (Stmt v) (AExp v)
-stmtAVar = stmtAExp . aExpAVar
+stmtAVar = stmtAExp . aVar
 
 stmtBlock :: MatchInto' (Stmt v) (Block v)
 stmtBlock = recursiveMatch . possibly
@@ -232,4 +241,31 @@ stmtBlock = recursiveMatch . possibly
   , sIteBlock
   , sWhileBlock
   ]
+
+-- -------
+-- Recursive patterns
+-- -------
+
+instance RecursiveMatch (AExp v) where
+  subMatch :: MatchSelf (AExp v)
+  subMatch = possibly
+    [ aDivArg
+    , aAddArg
+    ]
+
+instance RecursiveMatch (BExp v) where
+  subMatch :: MatchSelf (BExp v)
+  subMatch = possibly
+    [ bNegArg
+    , bAndArg
+    ]
+
+instance RecursiveMatch (Stmt v) where
+  subMatch :: MatchSelf (Stmt v)
+  subMatch = possibly
+    [ sBlock . block
+    , sIteBlock . block
+    , sWhileBlock . block
+    , sSeqFirst
+    ]
 

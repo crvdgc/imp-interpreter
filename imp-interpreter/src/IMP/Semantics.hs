@@ -8,12 +8,14 @@ import           IMP.Exception
 import           IMP.Pattern
 import           IMP.Syntax
 
-import           Control.Exception (throw)
-import           Data.Foldable     (toList)
-import           Data.Function     ((&))
-import qualified Data.IntMap       as M
-import           Data.Maybe        (fromJust)
-import qualified Data.Set          as S
+import           Control.Applicative ((<|>))
+import           Control.Exception   (throw)
+import           Data.Foldable       (toList)
+import           Data.Function       ((&))
+import qualified Data.IntMap         as M
+import           Data.List           (unfoldr)
+import           Data.Maybe          (fromJust, isJust)
+import qualified Data.Set            as S
 
 data KResult = KRInt  Int
              | KRBool Bool
@@ -56,8 +58,8 @@ indexIdFromSet idSet fv = (, idMap) <$> indexed
                   Nothing -> Left v
                   Just ix -> Right ix
 
-deindexId :: (Functor f) => f IdKey -> IdMap v -> f v
-deindexId indexed idMap = (idMap M.!) <$> indexed
+deindexId :: (Functor f) => IdMap v -> f IdKey -> f v
+deindexId idMap = fmap (idMap M.!)
 
 -- -------
 -- Config utils
@@ -68,10 +70,6 @@ indexPgm :: (Ord v, Show v) => Pgm v -> (Stmt IdKey, IdMap v)
 indexPgm pgm@Pgm{..} = case indexIdWith decls stmt of
   Left v    -> throw $ IEVariableNotDeclared (show v) (show pgm)
   Right res -> res
-
--- | initialize a configuration for an indexed pgm
-initializeConfig :: Pgm IdKey -> Config (Pgm IdKey)
-initializeConfig pgm = Config pgm M.empty
 
 -- | additional pattern for kCell
 matchK :: MatchInto' (Config (Stmt v)) (Stmt v)
@@ -89,19 +87,14 @@ type Rule = Config (Stmt IdKey) -> Maybe (Config (Stmt IdKey))
 -- Variable rules
 -- ---------------
 
--- | initialize declared variables to 0
--- Since indexing already checked variable declarations, we simply discard @decls@
--- When query a missing variable, we use the default value 0
-varDecl :: Config (Pgm IdKey) -> Config (Stmt IdKey)
-varDecl Config{..} = Config (stmt kCell) state
-
 -- | variable lookup
 ruleVarLookup :: Rule
 ruleVarLookup cfg@Config{..} = cfg & (matchK . stmtAVar $ rho)
   where
-    rho (AVar key) = case M.findWithDefault (KRInt 0) key state of
-      KRInt i  -> Just (ALit i)
-      KRBool _ -> throw $ IETypeError (show key) "Int" "Bool" (show cfg)
+    rho (AVar key) = case M.lookup key state of
+      Just (KRInt i)  -> Just (ALit i)
+      Just (KRBool _) -> throw $ IETypeError (show key) "Int" "Bool" (show cfg)
+      Nothing         -> throw $ IEVariableNotInState (show key) (show cfg)
     rho _ = Nothing
 
 -- ---------------
@@ -158,6 +151,7 @@ ruleBlock :: Rule
 ruleBlock = matchK . recursiveMatch $ \case
   SBlock Nothing  -> Just SUnit  -- {}  => .
   SBlock (Just s) -> Just s      -- {S} => S
+  _               -> Nothing
 
 -- ---------------
 -- Assignment rule
@@ -165,11 +159,10 @@ ruleBlock = matchK . recursiveMatch $ \case
 
 -- | only perform assignment if it's head
 ruleAssign :: Rule
-ruleAssign cfg@Config{..} = do
-  (kCell', state') <- case kCell of
-    SSeq (SAssign v (ALit n)) s -> Just (SSeq SUnit s, update n v state)
-    _                           -> Nothing
-  pure $ Config kCell' state'
+ruleAssign cfg@Config{..} = case kCell of
+  SSeq (SAssign v (ALit n)) s -> Just $ Config (SSeq SUnit s) (update n v state)
+  SAssign v (ALit n)          -> Just $ Config SUnit (update n v state)
+  _                           -> Nothing
   where
     update n v state =
       if v `M.member` state
@@ -183,11 +176,9 @@ ruleAssign cfg@Config{..} = do
 -- | sequential composition of two statements
 -- if first statement is reduced to SUnit, forward the state to the second statement
 ruleSeqCompose :: Rule
-ruleSeqCompose cfg@Config{..} = do
-  kCell' <- case kCell of
-    SSeq SUnit s -> Just s
-    _            -> Nothing
-  pure $ Config kCell' state
+ruleSeqCompose cfg@Config{..} = case kCell of
+  SSeq SUnit s -> Just (Config s state)
+  _            -> Nothing
 
 -- | if-then-else (only the condition is strict)
 ruleIte :: Rule
@@ -199,7 +190,7 @@ ruleIte = matchK . recursiveMatch . sIte $ \case
 -- | unrolling while
 ruleWhile :: Rule
 ruleWhile = matchK . recursiveMatch . sWhile $ \case
-  SWhile c b -> Just $ SIte c b Nothing
+  SWhile c b -> Just $ SIte c (Just (SSeq (SBlock b) (SWhile c b))) Nothing
   _          -> Nothing
 
 -- -------
@@ -230,3 +221,55 @@ computationRules =
   , ruleWhile
   , ruleVarLookup
   ]
+
+-- | succeeds if any rule is applied
+applyRules :: [Rule] -> Rule
+applyRules rs cfg = foldr ((<|>) . (cfg &)) Nothing rs
+
+-- | iterately apply a rule
+iteratively :: Rule -> Config (Stmt IdKey) -> [Maybe (Config (Stmt IdKey))]
+iteratively r cfg = iterate (>>= r) (Just cfg)
+
+-- | find closure of a rule application
+closureWithin :: Int -> [Maybe (Config (Stmt IdKey))] -> Config (Stmt IdKey)
+closureWithin n = fromJust . last . atMost n . takeWhile isJust
+
+-- | restrict evaluation steps
+-- configs must be a @Just@ list
+atMost :: Int -> [Maybe (Config (Stmt IdKey))] -> [Maybe (Config (Stmt IdKey))]
+atMost n = go n n
+  where
+    go n 0 ((Just cfg):_) = throw $ IEDiverge n (show cfg)
+    go n k (mc:mcs)       = mc : go n (k-1) mcs
+    go n _ []             = []
+
+closureRulesWithin :: Int -> [Rule] -> Config (Stmt IdKey) -> Config (Stmt IdKey)
+closureRulesWithin n rules = closureWithin n . iteratively (applyRules rules)
+
+-- | A computation step is a possible application of a computational rule,
+-- with potentially many application of structural rules
+nextComputationStep :: Rule
+nextComputationStep cfg = let cfg' = closureRulesWithin 1000 structuralRules cfg
+                           in applyRules computationRules cfg'
+
+interpretIndexed :: Config (Stmt IdKey) -> Config (Stmt IdKey)
+interpretIndexed cfg =
+  let cfg' = closureWithin 1000 . iteratively nextComputationStep $ cfg
+   in if kCell cfg' == SUnit
+         then cfg'
+         else throw $ IEStuck (show cfg')
+
+initializeConfig :: (Ord v, Show v) => Pgm v -> (Config (Stmt IdKey), IdMap v)
+initializeConfig pgm =
+  let (indexed, idMap) = indexPgm pgm
+      initCfg = Config indexed $ M.map (const $ KRInt 0) idMap
+   in (initCfg, idMap)
+
+
+interpret :: (Ord v, Show v) => Pgm v -> Config (Pgm v)
+interpret pgm =
+  let (initCfg, idMap) = initializeConfig pgm
+      resCfg = interpretIndexed initCfg
+      resPgm = Pgm [] (deindexId idMap $ kCell resCfg)
+   in Config resPgm (state resCfg)
+

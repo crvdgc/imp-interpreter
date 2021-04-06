@@ -16,6 +16,7 @@ data IMPException
   | IETypeError Trm Typ Typ Cfg
   | IEDividedByZero Trm
   | IEStuck Cfg
+  | IEDiverge Int Cfg
   deriving (Typeable)
 
 instance Show IMPException where
@@ -30,6 +31,8 @@ instance Show IMPException where
       "Divide by zero in " <> term
     IEStuck cfg ->
       "No rules to apply, stuck\nConfig: " <> cfg
+    IEDiverge n cfg ->
+      "Not converge after " <> show n <> " steps, might diverge\nConfig: " <> cfg
 
 instance Exception IMPException
 

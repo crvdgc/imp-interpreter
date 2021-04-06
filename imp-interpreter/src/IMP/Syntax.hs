@@ -59,7 +59,7 @@ data Pgm v = Pgm
 instance Show v => Show (AExp v) where
   show = \case
     ALit n -> show n
-    AVar v -> show v
+    AVar v -> '$' : show v
     ANeg n -> "-" <> show n
     ADiv e1 e2 -> show e1 <> " / " <> show e2
     AAdd e1 e2 -> show e1 <> " + " <> show e2
@@ -76,7 +76,8 @@ instance Show v => Show (Stmt v) where
   show = \case
     SBlock Nothing  -> "{}"
     SBlock (Just s) -> "{\n" <> show s <> "\n}"
-    SAssign v e     -> show v <> " = " <> show e <> ";"
+    SAssign v e     -> ('$':show v) <> " = " <> show e <> ";"
     SIte e s1 s2    -> "if (" <> show e <> ")\nthen {\n" <> show s1 <> "}\nelse {\n" <> show s2 <> "}"
     SWhile e s      -> "while (" <> show e <> ")\n{" <> show s <> "}"
     SSeq s1 s2      -> show s1 <> "\n" <> show s2
+    SUnit           -> "."
