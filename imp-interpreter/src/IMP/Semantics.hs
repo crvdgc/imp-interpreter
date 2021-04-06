@@ -173,11 +173,13 @@ ruleAssign cfg@Config{..} = case kCell of
 -- Sequential composition rule
 -- ---------------
 
--- | sequential composition of two statements
+-- | sequential composition of two statements, normalized with monoid composition
 -- if first statement is reduced to SUnit, forward the state to the second statement
 ruleSeqCompose :: Rule
-ruleSeqCompose cfg@Config{..} = case kCell of
-  SSeq SUnit s -> Just (Config s state)
+ruleSeqCompose = matchK $ \case
+  SSeq SUnit s         -> Just s                       -- left unit
+  SSeq (SSeq s1 s2) s3 -> Just $ SSeq s1 (SSeq s2 s3)  -- normalization
+  SSeq s SUnit         -> Just s                       -- right unit, unlikely to see
   _            -> Nothing
 
 -- | if-then-else (only the condition is strict)
@@ -246,15 +248,17 @@ atMost n = go n n
 closureRulesWithin :: Int -> [Rule] -> Config (Stmt IdKey) -> Config (Stmt IdKey)
 closureRulesWithin n rules = closureWithin n . iteratively (applyRules rules)
 
+applyStructualRules :: Config (Stmt IdKey) -> Config (Stmt IdKey)
+applyStructualRules = closureRulesWithin 10000 structuralRules
+
 -- | A computation step is a possible application of a computational rule,
 -- with potentially many application of structural rules
 nextComputationStep :: Rule
-nextComputationStep cfg = let cfg' = closureRulesWithin 1000 structuralRules cfg
-                           in applyRules computationRules cfg'
+nextComputationStep = applyRules computationRules . applyStructualRules
 
 interpretIndexed :: Config (Stmt IdKey) -> Config (Stmt IdKey)
 interpretIndexed cfg =
-  let cfg' = closureWithin 1000 . iteratively nextComputationStep $ cfg
+  let cfg' = applyStructualRules . closureWithin 10000 . iteratively nextComputationStep $ cfg
    in if kCell cfg' == SUnit
          then cfg'
          else throw $ IEStuck (show cfg')
@@ -266,10 +270,10 @@ initializeConfig pgm =
    in (initCfg, idMap)
 
 
-interpret :: (Ord v, Show v) => Pgm v -> Config (Pgm v)
+interpret :: (Ord v, Show v) => Pgm v -> (IdMap v, Config (Pgm v))
 interpret pgm =
   let (initCfg, idMap) = initializeConfig pgm
       resCfg = interpretIndexed initCfg
       resPgm = Pgm [] (deindexId idMap $ kCell resCfg)
-   in Config resPgm (state resCfg)
+   in (idMap, Config resPgm (state resCfg))
 

@@ -170,24 +170,9 @@ sIteCond f = \case
   SIte c b1 b2 -> (\c' -> SIte c' b1 b2) <$> f c
   _            -> Nothing
 
-sIteBlock :: MatchInto' (Stmt v) (Block v)
-sIteBlock f = \case
-  SIte c b1 b2 -> binaryConstr f (SIte c) b1 b2
-  _            -> Nothing
-
 sWhile :: MatchSelf (Stmt v)
 sWhile f s = case s of
   SWhile _ _ -> f s
-  _          -> Nothing
-
-sWhileCond :: MatchInto' (Stmt v) (BExp v)
-sWhileCond f = \case
-  SWhile c b -> flip SWhile b <$> f c
-  _          -> Nothing
-
-sWhileBlock :: MatchInto' (Stmt v) (Block v)
-sWhileBlock f = \case
-  SWhile c b -> SWhile c <$> f b
   _          -> Nothing
 
 sSeq :: MatchSelf (Stmt v)
@@ -223,7 +208,6 @@ bExpAExp = recursiveMatch . bLeArg
 stmtBExp :: MatchInto' (Stmt v) (BExp v)
 stmtBExp = recursiveMatch . possibly
   [ sIteCond
-  , sWhileCond
   ] . recursiveMatch
 
 stmtAExp :: MatchInto' (Stmt v) (AExp v)
@@ -234,13 +218,6 @@ stmtAExp = recursiveMatch . possibly
 
 stmtAVar :: MatchInto' (Stmt v) (AExp v)
 stmtAVar = stmtAExp . aVar
-
-stmtBlock :: MatchInto' (Stmt v) (Block v)
-stmtBlock = recursiveMatch . possibly
-  [ sBlock
-  , sIteBlock
-  , sWhileBlock
-  ]
 
 -- -------
 -- Recursive patterns
@@ -264,8 +241,6 @@ instance RecursiveMatch (Stmt v) where
   subMatch :: MatchSelf (Stmt v)
   subMatch = possibly
     [ sBlock . block
-    , sIteBlock . block
-    , sWhileBlock . block
     , sSeqFirst
     ]
 

@@ -22,8 +22,8 @@ main = defaultMain tests
 
 tests :: TestTree
 tests = testGroup "Tests"
-  [ -- properties
-    unitTests
+  [ properties
+  , unitTests
   , functionalTests
   ]
 
@@ -96,17 +96,14 @@ checkAgainst pgm ref =
 
 collatzRes :: [(T.Text, KResult)]
 collatzRes = [ ("s", KRInt 66)
-             , ("m", KRInt 10)
              ]
 
 primesRes :: [(T.Text, KResult)]
 primesRes = [ ("s", KRInt 4)
-            , ("m", KRInt 10)
             ]
 
 sumRes :: [(T.Text, KResult)]
-sumRes = [ ("n", KRInt 0)
-         , ("sum", KRInt 5050)
+sumRes = [ ("sum", KRInt 5050)
          ]
 
 
