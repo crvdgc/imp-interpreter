@@ -156,9 +156,6 @@ aToC = aToB . bToC
 
 `MatchSelf` just says that the pattern is of the sum type of the overall structure. They are not necessarily the same. (e.g. `aLit :: MatchSelf (AExp v)`)
 
-```hs
-```
-
 A special case is when the structure is recursively defined, then we can recursively match all the occurrences of the substructure.
 
 ```hs
