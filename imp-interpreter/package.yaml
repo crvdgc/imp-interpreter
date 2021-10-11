@@ -27,6 +27,8 @@ dependencies:
 
 library:
   source-dirs: src
+  dependencies:
+      - lens
 
 executables:
   imp-interpret:

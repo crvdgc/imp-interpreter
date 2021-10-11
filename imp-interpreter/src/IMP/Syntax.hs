@@ -5,16 +5,19 @@
 {-# LANGUAGE InstanceSigs      #-}
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE RecordWildCards   #-}
-module IMP.Syntax
-  ( AExp(..)
-  , BExp(..)
-  , Block
-  , Stmt(..)
-  , Pgm(..)
-  )
-  where
+{-# LANGUAGE TemplateHaskell   #-}
+--module IMP.Syntax
+--  ( AExp(..)
+--  , BExp(..)
+--  , Block
+--  , Stmt(..)
+--  , Pgm(..)
+--  )
+--  where
+module IMP.Syntax where
 
 import           GHC.Generics
+import Control.Lens.TH
 
 -- -------
 -- Expressions and Statements
@@ -41,6 +44,10 @@ data Stmt v = SBlock  (Block v)
             | SSeq    (Stmt v) (Stmt v)
             | SUnit                                 -- identity of @SSeq@
   deriving (Eq, Functor, Foldable, Traversable, Generic)
+makePrisms ''AExp
+makePrisms ''BExp
+makePrisms ''Stmt
+
 
 -- -------
 -- Programs

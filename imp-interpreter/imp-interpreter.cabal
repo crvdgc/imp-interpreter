@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.33.0.
+-- This file has been generated from package.yaml by hpack version 0.34.4.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: c808ebf577d2b329c655170478ca3b6af8c3a73486ba98884acdce753d92feef
+-- hash: ccc62937950578431a157cc20b046c9797f94fd81095ee72f44c8e03956c6a73
 
 name:           imp-interpreter
 version:        0.1.0.0
@@ -37,7 +37,8 @@ library
       src
   build-depends:
       base >=4.7 && <5
-    , containers >=0.6 && <0.7
+    , containers ==0.6.*
+    , lens
     , text >=1.2.4 && <1.3
   default-language: Haskell2010
 
@@ -50,7 +51,7 @@ executable imp-interpret
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
-    , containers >=0.6 && <0.7
+    , containers ==0.6.*
     , imp-interpreter
     , text >=1.2.4 && <1.3
   default-language: Haskell2010
@@ -66,11 +67,11 @@ test-suite imp-interpreter-test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
-    , containers >=0.6 && <0.7
+    , containers ==0.6.*
     , imp-interpreter
     , smallcheck >=1.2.0 && <1.3
     , tasty >=1.2.3 && <1.3
-    , tasty-hunit >=0.10 && <0.11
+    , tasty-hunit ==0.10.*
     , tasty-smallcheck >=0.8.2 && <0.9
     , text >=1.2.4 && <1.3
   default-language: Haskell2010
